@@ -1,5 +1,16 @@
 # User Stories
 
+## Workflow
+
+Every non-trivial change follows the same sequence, in order:
+
+1. **User Story** — the need, written from the Product Owner's perspective
+   (`docs/product-owner.md`), with the business justification and acceptance criteria.
+2. **GitHub issue** — the US turned into a trackable issue.
+3. **Design** — for significant choices, a Design Decision (DD) recorded in
+   `docs/OOD/design-decisions.md` *before* any code is written.
+4. **Implementation** — only after the design is agreed.
+
 ## Phase 0 — Foundations
 
 | ID | Title |
@@ -15,3 +26,9 @@
 |----|-------|
 | [US005](phase-1-analysis/US005-object-oriented-analysis.md) | Object-Oriented Analysis (OOA) |
 | [US006](phase-1-analysis/US006-object-oriented-design.md) | Object-Oriented Design (OOD) |
+
+## Phase 2 — Implementation
+
+| ID | Title |
+|----|-------|
+| [US007](phase-2-implementation/US007-production-database.md) | Production Database |

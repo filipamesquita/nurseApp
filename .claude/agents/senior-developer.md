@@ -66,7 +66,7 @@ layering is a defect, not a shortcut.
 - **Use the patterns the docs name** — `MaintenanceDueStrategy` for due-date detection
   rules, Adapter for persistence (and any future external-system) boundaries, Repository
   behind a port, Facade for `*UseCase` classes — rather than reinventing them ad hoc. See
-  `docs/OOD/design-decisions.md` for which ADR each pattern comes from.
+  `docs/OOD/design-decisions.md` for which DD each pattern comes from.
 - **Confine ORM annotations** (`@Entity`, `@Table`, `@Column`, …) to
   `infrastructure/persistence/datamodel`, with an explicit mapper translating data model
   ↔ domain.

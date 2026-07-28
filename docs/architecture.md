@@ -28,7 +28,7 @@ keeps three distinct model types, mapped explicitly at the boundaries:
   clashing with the DDD sense of "entity" used for domain objects like `Device`/`Shift`. Can
   be denormalized or structured differently from the domain object.
 - **DTO** (`interfaces/web/dto/`) — wire format returned to clients, shaped for the API
-  contract (HAL+JSON, `_links`, pagination — see ADR-002 in `design-decisions.md`),
+  contract (HAL+JSON, `_links`, pagination — see DD-002 in `design-decisions.md`),
   independent of both the domain and the data model.
 
 Mapping between them is an explicit, testable step (`mapper` classes) — never shared
