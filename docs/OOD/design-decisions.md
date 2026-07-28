@@ -88,9 +88,10 @@ Architecture defect this project explicitly avoids.
 ## DD-004 — Ports & Adapters (Dependency Inversion)
 
 **Decision.** The `application` layer depends only on outbound **ports**
-(`DeviceRepositoryPort`, `ShiftRepositoryPort`, `ChecklistExecutionRepositoryPort`,
-`MaintenanceReportRepositoryPort`, `UserRepositoryPort`, `OperatingRoomRepositoryPort` —
-interfaces in `domain/repository`). Concrete adapters in `infrastructure` implement them
+(`DeviceRepositoryPort`, `ShiftRepositoryPort`, `ShiftAssignmentRepositoryPort`,
+`ChecklistExecutionRepositoryPort`, `MaintenanceReportRepositoryPort`, `UserRepositoryPort`,
+`OperatingRoomRepositoryPort` — interfaces in `domain/repository`). Concrete adapters in
+`infrastructure` implement them
 (e.g. `DeviceRepositoryAdapter` over Spring Data JPA). Wiring happens once in
 `infrastructure/config/AppConfig`.
 
@@ -130,6 +131,114 @@ Facade hides the multi-collaborator orchestration; each use case has one reason 
 
 ---
 
+## DD-007 — Domain shared kernel (marker interfaces)
+
+**Decision.** A small `domain/kernel` package holds marker interfaces used by every domain
+class: `ValueObject`, `DomainId` (extends `ValueObject`), `DomainEntity<ID>` (declares
+`identity()` and value-based `sameAs(Object)`), `AggregateRoot<ID>` (extends `DomainEntity`),
+and `RepositoryPort<ID, T>` (generic repository contract, only satisfiable for an
+`AggregateRoot`).
+
+**Context.** Adapted from the MiteLovers project's `ddd/` shared kernel. Without a common
+vocabulary, each aggregate risks inventing its own notion of identity/equality ad hoc.
+
+**Rationale.**
+- **Compiler-enforced structure** — only a type that implements `AggregateRoot` can be
+  paired with a `RepositoryPort`.
+- **Cheap and stable** — pure marker interfaces, no logic, so the kernel itself can't become
+  a source of coupling or bugs.
+
+**Trade-off.** One more package to know about before writing any domain class; accepted
+since the alternative (implicit, undocumented conventions) is what actually causes drift
+across aggregates over time.
+
+---
+
+## DD-008 — Aggregate construction via a dedicated Factory
+
+**Decision.** Aggregate Roots (e.g. the forthcoming `Device`, `Shift`, `ShiftAssignment`) get
+a package-private constructor and a dedicated `<Aggregate>Factory` class in the same package
+— the only public way to construct them. Value Objects (e.g. `Periodicity`) are exempt: they
+keep public, self-validating constructors.
+
+**Context.** Adapted from MiteLovers, which enforces this by visibility rather than
+convention alone.
+
+**Rationale.**
+- **Single, obvious construction point** — one place to look for how an aggregate can be
+  created and what invariants that requires.
+- **Separation of concerns** — the aggregate class stays focused on behavior, not
+  construction wiring.
+
+**Trade-off.** An extra class per aggregate versus a public constructor. Deliberately scoped
+to Aggregate Roots only — applying it to Value Objects too was considered and rejected, to
+avoid ceremony where a public constructor already fully validates its own invariants.
+
+---
+
+## DD-009 — Identity equality vs value equality for domain entities
+
+**Decision.** Every `DomainEntity` implements both: `equals()`/`hashCode()` compare identity
+(the ID) only, and `sameAs(Object)` compares business-meaningful attribute values. Value
+Objects only ever need `equals()`/`hashCode()` (value-based) — `sameAs` doesn't apply since
+they have no identity to begin with.
+
+**Context.** Adapted from MiteLovers. Without the split, "are these the same record"
+(identity) and "do these currently hold the same data" (value) collapse into a single
+ambiguous `equals()`.
+
+**Rationale.** Information Expert — each object owns both notions of comparison, since only
+it knows which of its fields are its identity versus its current state.
+
+---
+
+## DD-010 — JaCoCo coverage gate
+
+**Decision.** `jacoco-maven-plugin` is added to `pom.xml`: a `report` goal bound to `test`
+and a `check` goal bound to `verify`, requiring `BUNDLE`/`LINE`/`COVEREDRATIO` >= 0.95.
+`mvn verify` fails below that threshold.
+
+**Context.** Adapted from MiteLovers, which enforces the same gate. PIT mutation testing
+(already expected per the project's TDD conventions, >80% mutation coverage) is
+complementary, not a substitute — JaCoCo checks line coverage, PIT checks whether the tests
+actually assert anything meaningful.
+
+**Rationale.** A hard, automated floor for coverage, enforced the same way for every future
+contribution rather than left to reviewer discretion.
+
+---
+
+## DD-011 — Shift as a time window, ShiftAssignment as a separate aggregate
+
+**Decision.** `Shift` represents only a time window (`id` + window/status) — no `nurseId`,
+no `roomId`. A new Aggregate Root, `ShiftAssignment`, links a nurse, an operating room, and a
+shift together: `id`, `shiftId`, `roomId`, `nurseId`, `assignedById` (the `HEAD_NURSE` who
+made the assignment). Multiple `ShiftAssignment` records can share the same `shiftId` — X
+nurses per shift. `Role` gains a third value: `HEAD_NURSE`, alongside `NURSE` and `ADMIN`.
+
+**Context.** The original single-`nurseId`-per-`Shift` model didn't reflect reality: a head
+nurse assigns a variable number of nurses to rooms at the start of each shift, and that
+assignment is itself an event worth recording (who assigned whom, when) — not just a fixed
+field on `Shift`.
+
+**Rationale.**
+- **Information Expert** — "nurse N is in room R for shift S" is its own piece of knowledge,
+  with its own author (`assignedById`); it doesn't belong embedded in `Shift`.
+- **Small aggregates preferred** — `Shift` (a time window) and `ShiftAssignment` (an
+  assignment event) each keep one reason to change.
+- **`ChecklistExecution` unaffected** — it already references `roomId` + `performedById`
+  directly, independent of `Shift`, so this restructuring doesn't ripple into it.
+
+**Trade-off.** One more aggregate/repository pair versus a single denormalized `Shift`.
+Accepted — "X nurses per shift" was impossible to express correctly with a single `nurseId`
+field, so this isn't optional complexity.
+
+**Rejected alternative.** A single `Nurse` aggregate distinct from `User` — rejected for now
+since `Nurse`/`HeadNurse`/`Admin` share identity/login and nothing yet differs structurally
+between them; revisit if nurse-specific data (certifications, specialty) emerges later.
+
+---
+
 ## GoF patterns used (summary)
 
 | Pattern | Where | Purpose |
@@ -138,7 +247,7 @@ Facade hides the multi-collaborator orchestration; each use case has one reason 
 | Adapter | Repository adapters, mappers | Bridge ORM to ports (DD-004, DD-003). |
 | Repository | `*RepositoryPort` + JPA adapter | Persistence hidden behind a port. |
 | Facade | `*UseCase` classes | One coordinating method per operation (DD-006). |
-| Factory | value-object constructors / `DeviceId.newId()` | Enforce invariants and generate identity at construction. |
+| Factory | `<Aggregate>Factory` classes (package-private aggregate constructors) | Enforce invariants and control construction (DD-008); Value Objects self-validate via public constructors instead. |
 
 ---
 
@@ -147,16 +256,20 @@ Facade hides the multi-collaborator orchestration; each use case has one reason 
 The domain model introduces types that do **not** exist in `domain/` yet and are design
 blueprints to be created during backend scaffolding:
 
-- Identity value objects: `DeviceId`, `RoomId`, `ShiftId`, `ChecklistId`, `ReportId`, `UserId`.
-- Other value objects: `Role`, `DeviceType`, `ShiftWindow`, `ShiftStatus`, `CheckStatus`,
-  `ReportStatus`.
-- Entities / aggregate roots: `Device`, `User`, `OperatingRoom`, `Shift`,
-  `ChecklistExecution` (+ `CheckItem` entity), `MaintenanceReport`.
+- Identity value objects: `DeviceId`, `RoomId`, `ShiftId`, `ShiftAssignmentId`, `ChecklistId`,
+  `ReportId`, `UserId`.
+- Other value objects: `Role` (`NURSE` / `HEAD_NURSE` / `ADMIN`), `DeviceType`,
+  `ShiftWindow`, `ShiftStatus`, `CheckStatus`, `ReportStatus`.
+- Entities / aggregate roots: `Device`, `User`, `OperatingRoom`, `Shift` (time window only,
+  see DD-011), `ShiftAssignment` (nurse × room × shift, recorded by a `HEAD_NURSE`, see
+  DD-011), `ChecklistExecution` (+ `CheckItem` entity), `MaintenanceReport`. Each aggregate
+  root's constructor is package-private, built via a `<Aggregate>Factory` (DD-008).
 - Domain service/strategy: `MaintenanceDueService`, `MaintenanceDueStrategy`,
   `PeriodicityBasedDueStrategy`.
-- Application: all `*UseCase`, `*Port` interfaces.
+- Application: all `*UseCase`, `*Port` interfaces (including `ShiftAssignmentRepositoryPort`).
 - Infrastructure: JPA data models, mappers, repository adapters, `MaintenanceWarningScheduler`.
 - Web: controllers, DTOs, mappers.
 
-Today `domain/` contains only `Periodicity` (built via TDD, see
-`PeriodicityTest`).
+Today `domain/` contains `Periodicity` (built via TDD, see `PeriodicityTest`) and the
+`domain/kernel` marker interfaces (`ValueObject`, `DomainId`, `DomainEntity`, `AggregateRoot`,
+`RepositoryPort` — DD-007).

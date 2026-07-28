@@ -1,28 +1,29 @@
 package com.example.demo.domain.model;
 
+import com.example.demo.domain.kernel.ValueObject;
 import java.time.LocalDate;
 import java.util.Objects;
 
-public final class Periodicity {
+public final class Periodicity implements ValueObject {
 
-    private final int intervalDays;
+    private final int _intervalDays;
 
     public Periodicity(int intervalDays) {
         if (intervalDays <= 0) {
             throw new IllegalArgumentException("intervalDays must be positive");
         }
-        this.intervalDays = intervalDays;
+        this._intervalDays = intervalDays;
     }
 
     public int intervalDays() {
-        return intervalDays;
+        return _intervalDays;
     }
 
     public LocalDate nextDueDateFrom(LocalDate lastReplacedAt) {
         if (lastReplacedAt == null) {
             throw new IllegalArgumentException("lastReplacedAt is required");
         }
-        return lastReplacedAt.plusDays(intervalDays);
+        return lastReplacedAt.plusDays(_intervalDays);
     }
 
     @Override
@@ -34,11 +35,11 @@ public final class Periodicity {
             return false;
         }
         Periodicity that = (Periodicity) other;
-        return intervalDays == that.intervalDays;
+        return _intervalDays == that._intervalDays;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(intervalDays);
+        return Objects.hash(_intervalDays);
     }
 }
