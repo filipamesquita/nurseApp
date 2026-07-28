@@ -1,8 +1,10 @@
 package com.example.demo.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
@@ -79,5 +81,34 @@ class PeriodicityTest {
 
         // Assert
         assertNotEquals(periodicityA, periodicityB);
+    }
+
+    @Test
+    void test_equals_sameReference_returnsTrue() {
+        // Arrange
+        Periodicity periodicity = new Periodicity(30);
+
+        // Assert
+        assertTrue(periodicity.equals(periodicity));
+    }
+
+    @Test
+    void test_equals_differentType_returnsFalse() {
+        // Arrange
+        Periodicity periodicity = new Periodicity(30);
+        String notAPeriodicity = "30";
+
+        // Assert
+        assertFalse(periodicity.equals(notAPeriodicity));
+    }
+
+    @Test
+    void test_hashCode_sameIntervalDays_returnsSameHashCode() {
+        // Arrange
+        Periodicity periodicityA = new Periodicity(30);
+        Periodicity periodicityB = new Periodicity(30);
+
+        // Assert
+        assertEquals(periodicityA.hashCode(), periodicityB.hashCode());
     }
 }
