@@ -239,6 +239,36 @@ between them; revisit if nurse-specific data (certifications, specialty) emerges
 
 ---
 
+## DD-012 — DevicePlacement as a separate aggregate linking Device and OperatingRoom
+
+**Decision.** `Device` and `OperatingRoom` each know only about themselves — neither holds a
+reference to the other. A new Aggregate Root, `DevicePlacement`, records which device is (or
+was) in which room: `id`, `deviceId`, `roomId`, `since` (when the placement started). "What
+device is currently in room Coral?" is answered by querying the active `DevicePlacement` for
+that `roomId`, not by reading a field on `Device` or `OperatingRoom`.
+
+**Context.** Devices are moved between rooms over time (DD confirmed in conversation with the
+Product Owner: "podem ser mudados de sala"). A simple `roomId` field on `Device` would answer
+"where is it now" but destroy history on every move — the previous placement is silently
+overwritten. The checklist walking-skeleton (US009+) needs to record, at a point in time,
+which device was verified in which room, so that history must survive re-placement.
+
+**Rationale.**
+- **Information Expert** — "device D is in room R as of time T" is its own fact, with its own
+  lifecycle (created when placed, superseded when moved); it doesn't belong embedded in either
+  `Device` or `OperatingRoom`.
+- **Small aggregates preferred, consistent with DD-011** — exactly the same reasoning already
+  applied to `Shift`/`ShiftAssignment`: the "container" (`Shift`, `OperatingRoom`) stays a
+  simple concept, and the assignment/placement is a separate fact with its own identity.
+- **History preserved for free** — reconstructing "where was the Airway device at 08:05" is a
+  query over `DevicePlacement` records, not lost information.
+
+**Trade-off.** One more aggregate/repository pair versus a single `roomId` field on `Device`.
+Accepted — the same trade-off already accepted in DD-011 for `Shift`/`ShiftAssignment`; a flat
+field cannot represent "changed over time" correctly.
+
+---
+
 ## GoF patterns used (summary)
 
 | Pattern | Where | Purpose |
@@ -260,10 +290,11 @@ blueprints to be created during backend scaffolding:
   `ReportId`, `UserId`.
 - Other value objects: `Role` (`NURSE` / `HEAD_NURSE` / `ADMIN`), `DeviceType`,
   `ShiftWindow`, `ShiftStatus`, `CheckStatus`, `ReportStatus`.
-- Entities / aggregate roots: `Device`, `User`, `OperatingRoom`, `Shift` (time window only,
-  see DD-011), `ShiftAssignment` (nurse × room × shift, recorded by a `HEAD_NURSE`, see
-  DD-011), `ChecklistExecution` (+ `CheckItem` entity), `MaintenanceReport`. Each aggregate
-  root's constructor is package-private, built via a `<Aggregate>Factory` (DD-008).
+- Entities / aggregate roots: `Device`, `User`, `OperatingRoom`, `DevicePlacement` (device ×
+  room, with history, see DD-012), `Shift` (time window only, see DD-011), `ShiftAssignment`
+  (nurse × room × shift, recorded by a `HEAD_NURSE`, see DD-011), `ChecklistExecution` (+
+  `CheckItem` entity), `MaintenanceReport`. Each aggregate root's constructor is
+  package-private, built via a `<Aggregate>Factory` (DD-008).
 - Domain service/strategy: `MaintenanceDueService`, `MaintenanceDueStrategy`,
   `PeriodicityBasedDueStrategy`.
 - Application: all `*UseCase`, `*Port` interfaces (including `ShiftAssignmentRepositoryPort`).
