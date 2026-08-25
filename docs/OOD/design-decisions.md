@@ -5,8 +5,7 @@ the context, and the rationale. These complement `docs/architecture.md` (the sta
 rules) by capturing the *choices* made and why. Referenced from US006 (and onward, as new
 DDs are added for later phases).
 
-Adapted from the Nortada project's decision-record style — decisions below are specific to
-nurseApp's own domain (devices, shifts, checklists), not carried over verbatim.
+Decisions below are specific to nurseApp's own domain (devices, shifts, checklists).
 
 ---
 
@@ -48,16 +47,14 @@ for proactive visibility.
 collection includes pagination links (`first`/`prev`/`next`/`last`) and each item includes
 `self`/`collection`.
 
-**Context.** nurseApp is an internal hospital tool, not a public multi-client API — but
-we're deliberately keeping architectural parity with how Nortada is built, since both
-projects follow the same standing conventions (`architecture.md`).
+**Context.** nurseApp is an internal hospital tool, not a public multi-client API — but the
+project follows this convention consistently per `architecture.md`.
 
 **Rationale.**
 - **Discoverability & decoupling** — any future client (web dashboard, companion mobile app)
   navigates by following links rather than hard-coding URI templates.
 - **Standard pagination** — HAL's page metadata + navigation links are a well-understood
   convention that Spring HATEOAS supports directly.
-- **Consistency across projects** — one architectural style to reason about instead of two.
 
 **Trade-off.** HAL adds envelope verbosity versus a flat JSON body, and is arguably more
 than a single-client internal tool strictly needs. Accepted for consistency with the
@@ -139,8 +136,8 @@ class: `ValueObject`, `DomainId` (extends `ValueObject`), `DomainEntity<ID>` (de
 and `RepositoryPort<ID, T>` (generic repository contract, only satisfiable for an
 `AggregateRoot`).
 
-**Context.** Adapted from the MiteLovers project's `ddd/` shared kernel. Without a common
-vocabulary, each aggregate risks inventing its own notion of identity/equality ad hoc.
+**Context.** Without a common vocabulary, each aggregate risks inventing its own notion of
+identity/equality ad hoc.
 
 **Rationale.**
 - **Compiler-enforced structure** — only a type that implements `AggregateRoot` can be
@@ -161,8 +158,7 @@ a package-private constructor and a dedicated `<Aggregate>Factory` class in the 
 — the only public way to construct them. Value Objects (e.g. `Periodicity`) are exempt: they
 keep public, self-validating constructors.
 
-**Context.** Adapted from MiteLovers, which enforces this by visibility rather than
-convention alone.
+**Context.** Enforced by visibility rather than convention alone.
 
 **Rationale.**
 - **Single, obvious construction point** — one place to look for how an aggregate can be
@@ -183,9 +179,8 @@ avoid ceremony where a public constructor already fully validates its own invari
 Objects only ever need `equals()`/`hashCode()` (value-based) — `sameAs` doesn't apply since
 they have no identity to begin with.
 
-**Context.** Adapted from MiteLovers. Without the split, "are these the same record"
-(identity) and "do these currently hold the same data" (value) collapse into a single
-ambiguous `equals()`.
+**Context.** Without the split, "are these the same record" (identity) and "do these
+currently hold the same data" (value) collapse into a single ambiguous `equals()`.
 
 **Rationale.** Information Expert — each object owns both notions of comparison, since only
 it knows which of its fields are its identity versus its current state.
@@ -198,10 +193,9 @@ it knows which of its fields are its identity versus its current state.
 and a `check` goal bound to `verify`, requiring `BUNDLE`/`LINE`/`COVEREDRATIO` >= 0.95.
 `mvn verify` fails below that threshold.
 
-**Context.** Adapted from MiteLovers, which enforces the same gate. PIT mutation testing
-(already expected per the project's TDD conventions, >80% mutation coverage) is
-complementary, not a substitute — JaCoCo checks line coverage, PIT checks whether the tests
-actually assert anything meaningful.
+**Context.** PIT mutation testing (already expected per the project's TDD conventions,
+>80% mutation coverage) is complementary, not a substitute — JaCoCo checks line coverage,
+PIT checks whether the tests actually assert anything meaningful.
 
 **Rationale.** A hard, automated floor for coverage, enforced the same way for every future
 contribution rather than left to reviewer discretion.
