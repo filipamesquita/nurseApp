@@ -32,3 +32,10 @@ Every non-trivial change follows the same sequence, in order:
 | ID | Title |
 |----|-------|
 | [US007](phase-2-implementation/US007-production-database.md) | Production Database |
+| [US008](phase-2-implementation/US008-device-aggregate.md) | Device Aggregate |
+| [US009](phase-2-implementation/US009-user-and-role.md) | User Aggregate with Role |
+| [US010](phase-2-implementation/US010-operating-room-aggregate.md) | OperatingRoom Aggregate |
+| [US011](phase-2-implementation/US011-device-placement-aggregate.md) | DevicePlacement Aggregate |
+| [US012](phase-2-implementation/US012-shift-and-assignment.md) | Shift and ShiftAssignment Aggregates |
+| [US013](phase-2-implementation/US013-checklist-execution.md) | ChecklistExecution Aggregate |
+| [US014](phase-2-implementation/US014-room-readiness-status.md) | Room Readiness Status (Read Model) |

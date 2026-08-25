@@ -24,9 +24,55 @@ jobs:
   sast-semgrep:
     name: SAST (Semgrep)
     runs-on: ubuntu-latest
+    # Least privilege: this job only needs to read the checked-out source and
+    # write SARIF results to GitHub code scanning — nothing else.
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - name: Placeholder
-        run: echo "SAST stage - coming in Phase 1"
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      # p/java keeps a first cut low-noise; broaden to p/security-audit later once
+      # findings are triaged. --severity ERROR + --error fails the job (blocking
+      # gate) only on high/critical-equivalent findings, not every INFO/WARNING hit.
+      #
+      # continue-on-error: true is deliberate: --error makes this step exit
+      # non-zero on findings, which would otherwise skip the SARIF upload below
+      # on exactly the runs where annotations matter most. The real pass/fail
+      # verdict is restored by the "Enforce Semgrep result" step at the end,
+      # after the SARIF has already been uploaded.
+      - name: Run Semgrep SAST scan
+        id: semgrep
+        continue-on-error: true
+        run: |
+          semgrep scan \
+            --config p/java \
+            --severity ERROR \
+            --error \
+            --metrics=off \
+            --sarif-output=semgrep.sarif \
+            src/main/java src/test/java
+
+      - name: Upload SARIF to GitHub code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+
+      - name: Enforce Semgrep result
+        if: steps.semgrep.outcome == 'failure'
+        run: |
+          echo "Semgrep found ERROR-severity findings — see the Security tab for inline annotations."
+          exit 1
 
   build-and-test-with-coverage:
     name: Build and Test with Coverage
@@ -43,8 +89,40 @@ jobs:
         run: mvn -B verify
 
   sca:
-    name: Software Composition Analysis
+    name: Software Composition Analysis (Trivy)
     runs-on: ubuntu-latest
+    # Least privilege: only needs read access to source and write access to
+    # upload SARIF to GitHub code scanning.
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - name: Placeholder
-        run: echo "SCA Dependency Check - To be implemented"
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # fs scan covers dependency manifests (pom.xml) for known CVEs. Fails the
+      # job on HIGH/CRITICAL findings; MEDIUM/LOW are reported but non-blocking.
+      - name: Run Trivy filesystem scan
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          format: sarif
+          output: trivy.sarif
+
+      - name: Upload SARIF to GitHub code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy.sarif
+
+      - name: Enforce Trivy result
+        if: steps.trivy.outcome == 'failure'
+        run: |
+          echo "Trivy found HIGH/CRITICAL vulnerable dependencies — see the Security tab for details."
+          exit 1
